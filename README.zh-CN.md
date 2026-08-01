@@ -1,19 +1,17 @@
-# Crop2Draw
+# Crop2Draw（中文摘要）
 
-将复杂示意图（架构图、论文配图等）手动裁切并导出为可编辑的 [draw.io](https://www.diagrams.net/) 文件。
+完整说明与配图见英文 [README.md](README.md)。
 
-完整说明见英文 [README.md](README.md)。
+将复杂架构图裁切为图层，导出可编辑的 [draw.io](https://www.diagrams.net/) 文件。
 
-## 快速开始
+**仓库：** https://github.com/ChenAI-TGF/Crop2Draw
 
 ```bash
+git clone https://github.com/ChenAI-TGF/Crop2Draw.git
+cd Crop2Draw
 pip install -r requirements.txt
-copy secrets.json.example secrets.json   # 仅文字 OCR 需要；填入百度密钥
+copy secrets.json.example secrets.json   # 仅文字 OCR 需要
 python crop_to_drawio.py path\to\figure.png
 ```
 
-**切勿将 `secrets.json` 提交到 GitHub。** 仓库只包含占位文件 `secrets.json.example`。
-
-## 许可
-
-[MIT](LICENSE)
+**切勿提交 `secrets.json`。** 协议：[MIT](LICENSE)
