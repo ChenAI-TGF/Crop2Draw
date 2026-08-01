@@ -1,4 +1,4 @@
-# 手动裁切 → Draw.io
+# Crop2Draw
 
 将复杂示意图（架构图、论文配图等）手动裁切并导出为可编辑的 [draw.io](https://www.diagrams.net/) 文件。
 

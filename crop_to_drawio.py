@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Manual crop UI: image / white-text / colored-text modes → draw.io."""
+"""Crop2Draw: manual crop UI — image / white-text / colored-text modes → draw.io."""
 
 from __future__ import annotations
 
@@ -1292,7 +1292,7 @@ class ImageReplaceDialog(QDialog):
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("手动裁切 → Draw.io（图片 / 文字 OCR）")
+        self.setWindowTitle("Crop2Draw — 手动裁切 → Draw.io（图片 / 文字 OCR）")
         self.resize(1460, 920)
 
         self.image_path: Path | None = None
@@ -2003,7 +2003,7 @@ class MainWindow(QMainWindow):
         if missing:
             QMessageBox.warning(self, "缺失文件", "以下图片裁切丢失：\n" + "\n".join(missing))
 
-        xml = f"""<mxfile host="app.diagrams.net" agent="manual-crop-tool" version="22.1.0" type="device">
+        xml = f"""<mxfile host="app.diagrams.net" agent="Crop2Draw" version="22.1.0" type="device">
   <diagram id="manual" name="{self.image_path.stem}">
     <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="{page_w}" pageHeight="{page_h}" math="0" shadow="0">
       <root>

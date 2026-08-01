@@ -1,8 +1,6 @@
-# Manual Crop → Draw.io
+# Crop2Draw
 
-A desktop tool for reconstructing complex figures (architecture diagrams, paper figures, etc.) into **editable [draw.io](https://www.diagrams.net/) files**.
-
-You manually crop regions from a source image, then export them as image layers and/or OCR-based editable text cells.
+Crop regions from complex figures and export them as editable [draw.io](https://www.diagrams.net/) layers (images + OCR text).
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -35,8 +33,8 @@ You manually crop regions from a source image, then export them as image layers 
 ## Install
 
 ```bash
-git clone https://github.com/<YOUR_USERNAME>/manual-crop-to-drawio.git
-cd manual-crop-to-drawio
+git clone https://github.com/<YOUR_USERNAME>/Crop2Draw.git
+cd Crop2Draw
 python -m venv .venv
 
 # Windows
@@ -127,7 +125,7 @@ set DRAWIO_PATH=C:\Path\to\draw.io.exe
 ## Project layout
 
 ```text
-manual-crop-to-drawio/
+Crop2Draw/
   crop_to_drawio.py      # PySide6 UI + export
   baidu_ocr.py           # Baidu OCR client (reads secrets.json)
   secrets.json.example   # placeholder credentials
