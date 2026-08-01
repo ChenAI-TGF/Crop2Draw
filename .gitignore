@@ -1,5 +1,6 @@
 # Secrets — NEVER commit API keys
 secrets.json
+**/secrets.json
 *.secrets.json
 .env
 .env.*
@@ -19,6 +20,8 @@ build/
 
 # Tool outputs / local work
 *_manual_crops/
+**/crops/
+icons.json
 *.drawio
 !docs/**/*.drawio
 

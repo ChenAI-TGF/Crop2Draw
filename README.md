@@ -1,126 +1,172 @@
 # Crop2Draw
 
-Crop regions from complex figures and export them as editable [draw.io](https://www.diagrams.net/) layers (images + OCR text).
+Turn complex architecture figures into **editable [draw.io](https://www.diagrams.net/) files**.
+
+Draw boxes on a bitmap figure, split it into image layers and OCR text cells, then export a `.drawio` you can fully edit — fonts, colors, sizes, and images.
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-## Features
+**Repo:** https://github.com/ChenAI-TGF/Crop2Draw
 
-- **Three crop modes** (pick after drawing a box; shortcuts `1` / `2` / `3`):
-  1. **Image** — save PNG and punch out the region
-  2. **White-background text** — Baidu OCR → review → editable draw.io text
-  3. **Colored-background text** — OCR + auto neighbor fill / eyedropper
-- Adjustable selection (handles, arrow keys) before confirming mode
-- Floating mode menu next to the cursor after drawing
-- Pan: **right-drag**, middle mouse, or Space + left-drag; wheel zoom
-- OCR profiles: **Standard** (`general_basic`, default) and **Accurate** (`accurate_basic`)
-- On the OCR review dialog (Standard profile): re-run with Accurate OCR; bold / italic / underline
-- Auto-naming for crops; Times New Roman text export with color estimation and box-fit font size
-- Export layer order: earlier crops appear **above** later ones
-- Multi-select delete in the crop list
-- **One-click export & open** in draw.io Desktop
-- Open the crops folder for manual edits
-- **Image replace processor**: drag / paste a new image, scale with aspect ratio (contain + pad), overwrite a target crop PNG
+---
 
-## Requirements
+## Motivation
 
-- Python 3.10+
-- [PySide6](https://pypi.org/project/PySide6/), [Pillow](https://pypi.org/project/Pillow/)
-- Optional: [Baidu AI Cloud OCR](https://cloud.baidu.com/product/ocr) API keys (text modes only)
-- Optional: [draw.io Desktop](https://github.com/jgraph/drawio-desktop/releases) for “export and open”
+If you work on paper reproduction or group meetings, you have probably hit this:
 
-## Install
+- The architecture figure for your slides is a flat bitmap — labels and arrows cannot be edited  
+- Manual screenshot crops break layer order; cutting an outer frame also steals inner modules  
+- Redrawing everything from scratch in draw.io is too slow  
+
+**Crop2Draw** lets you crop on the original image with three modes — **image / white-background text / colored-background text** — and export an editable `.drawio` in one click.
+
+---
+
+## Demo
+
+**Source figure to reconstruct:**
+
+![Source figure](examples/01_source.png)
+
+**After punch-out cropping:**
+
+![Punch-out progress](examples/02_punch_out.png)
+
+**One-click export to draw.io:**
+
+![Editable draw.io result](examples/03_drawio_result.png)
+
+Text is editable; font family, color, and size can be changed; image crops stay adjustable. AI-generated or scraped figures become a fully editable draw.io structure.
+
+---
+
+## What Crop2Draw does
+
+One line: **crop a complex schematic into layers, then export draw.io.**
+
+| Mode | Best for | Result |
+| --- | --- | --- |
+| `1` Image | Module blocks, icons, colored frames | PNG layer + punch-out on the canvas |
+| `2` White-bg text | Titles, captions on white | OCR → editable draw.io text |
+| `3` Colored-bg text | Labels on colored panels | OCR + fill (neighbor / eyedropper) |
+
+### Highlights
+
+- After drawing a box, pick a mode next to the cursor (shortcuts `1` / `2` / `3`):
+
+![Mode menu](examples/04_mode_menu.png)
+
+- OCR: choose **Standard** or **Accurate** (Baidu API; configure keys locally). If Standard is weak, re-run Accurate from the review dialog (you may still need light manual fixes):
+
+![OCR settings](examples/05_ocr_settings.png)
+
+- After OCR, fill the punched region with **white** or the **surrounding color**, so you do not leave an ugly blank hole:
+
+![OCR review / fill](examples/06_ocr_review.png)
+
+![Editable text after punch-out](examples/07_editable_text.png)
+
+Text becomes editable while nearby rounded rectangles stay intact.
+
+- **Image replace processor**: paste/drag a new image of a very different size; it is scaled with aspect ratio preserved into the target box  
+- **One-click export & open** in draw.io Desktop  
+
+API keys stay in local `secrets.json` and are never committed.
+
+---
+
+## Workflow
+
+### 1. Install & run
 
 ```bash
-git clone https://github.com/<YOUR_USERNAME>/Crop2Draw.git
+git clone https://github.com/ChenAI-TGF/Crop2Draw.git
 cd Crop2Draw
-python -m venv .venv
-
-# Windows
-.venv\Scripts\activate
-# macOS / Linux
-# source .venv/bin/activate
-
 pip install -r requirements.txt
-```
 
-## Configure OCR (optional)
+# Only needed for text OCR:
+# Windows:  copy secrets.json.example secrets.json
+# macOS/Linux: cp secrets.json.example secrets.json
+# then fill in your Baidu OCR keys
 
-Text modes need Baidu OCR credentials. **Do not commit real keys.**
-
-1. Copy the example file:
-
-   ```bash
-   # Windows
-   copy secrets.json.example secrets.json
-   # macOS / Linux
-   cp secrets.json.example secrets.json
-   ```
-
-2. Edit `secrets.json` and fill in your keys:
-
-   | Field | Baidu product |
-   | --- | --- |
-   | `baidu_api_key` / `baidu_secret_key` | Accurate OCR (`accurate_basic`) |
-   | `baidu_standard_api_key` / `baidu_standard_secret_key` | General OCR (`general_basic`) |
-   | `ocr_profile` | `"standard"` (default) or `"accurate"` |
-
-3. `secrets.json` is listed in `.gitignore`. Never push it to GitHub.
-
-Image-only workflows work **without** OCR keys.
-
-## Run
-
-```bash
-python crop_to_drawio.py
-# or open a figure directly
 python crop_to_drawio.py path/to/figure.png
 ```
 
-Windows: double-click `run.bat`, or:
+Windows: double-click `run.bat`, or `run.bat path\to\figure.png`.
 
-```bat
-run.bat path\to\figure.png
-```
+### 2. Cut inner modules first, outer frames later
 
-## Typical workflow
+Large frames (e.g. Backbone / Neck / Head) often wrap smaller blocks.  
+**Crop the inner pieces first**, then the outer frame.  
+Crop2Draw punches out finished regions, so the outer crop will not steal inner content.
 
-1. Open a source figure.
-2. Draw a box → choose mode `1` / `2` / `3` (or click the floating menu).
-3. Prefer cutting **inner** elements before outer frames (punch-out helps).
-4. For text: review OCR, optionally bold, optionally re-run Accurate OCR.
-5. Use **Image replace processor** if you need a higher-quality icon of a different pixel size.
-6. **Export and open** (or Export Draw.io).
+### 3. Shortcuts: image `1`, text `2` / `3`
 
-### Output layout
+- Colored modules / icons → `1`  
+- White-background labels → `2`  
+- Text on colored panels → `3` (neighbor fill or eyedropper)  
 
-Next to the source image (by default):
+Release the mouse to show the floating menu, or press `1` / `2` / `3` directly.
 
-```text
-<figure_stem>_manual_crops/
-  crops/           # PNG crops
-  icons.json       # manifest
-  <stem>_manual.drawio
-```
+### 4. Review OCR & style
 
-## draw.io Desktop path (optional)
+If Standard OCR is poor, click **Re-run with Accurate OCR**.  
+You can toggle bold; font size is fitted to the crop box to reduce odd wrapping.
 
-The “export and open” action looks for draw.io in this order:
+### 5. Replace low-res icons when needed
 
-1. Environment variable `DRAWIO_PATH` (full path to `draw.io.exe` / binary)
-2. Common install locations
-3. OS file association (`os.startfile` / `open` / `xdg-open`)
+Open **Image replace processor** → pick the target crop → drag/paste a new image → contain-scale into the box.  
+draw.io geometry stays the same (no stretch).
+
+### 6. Export
+
+Click **Export & open**: a translucent base image is included when text layers exist, for easy checking.  
+**Layer order:** earlier crops sit **above** later ones — cut outer frames last so they do not cover inner parts.
+
+---
+
+## Requirements
+
+- Python 3.10+  
+- [PySide6](https://pypi.org/project/PySide6/), [Pillow](https://pypi.org/project/Pillow/)  
+- Optional: [Baidu AI Cloud OCR](https://cloud.baidu.com/product/ocr) keys (text modes)  
+- Optional: [draw.io Desktop](https://github.com/jgraph/drawio-desktop/releases) for “export & open”  
+
+### Configure OCR (optional)
+
+1. Copy `secrets.json.example` → `secrets.json`  
+2. Fill in Accurate / Standard key pairs and `ocr_profile` (`"standard"` or `"accurate"`)  
+3. `secrets.json` is gitignored — **never push real keys**  
+
+Image-only workflows work without OCR keys.
+
+### draw.io path (optional)
+
+“Export & open” searches, in order:
+
+1. `DRAWIO_PATH` environment variable  
+2. Common install locations  
+3. OS file association  
 
 ```bat
 set DRAWIO_PATH=C:\Path\to\draw.io.exe
 ```
 
-## Security notes
+---
 
-- **Never commit `secrets.json`.**
-- Rotate any keys that were previously shared in chat, logs, or screenshots.
-- This repository ships only `secrets.json.example` with placeholders.
+## Output layout
+
+By default, next to the source image:
+
+```text
+<figure_stem>_manual_crops/
+  crops/                 # PNG crops
+  icons.json             # manifest
+  <stem>_manual.drawio
+```
+
+---
 
 ## Project layout
 
@@ -131,9 +177,27 @@ Crop2Draw/
   secrets.json.example   # placeholder credentials
   requirements.txt
   run.bat / run.sh
+  examples/              # README demo screenshots
   LICENSE                # MIT
   README.md
 ```
+
+---
+
+## Who is this for?
+
+- Paper writing / group meetings where architecture labels and arrows must be editable  
+- People who want editable draw.io results from AI-generated or web figures without redrawing from scratch  
+
+---
+
+## Security
+
+- **Never commit `secrets.json`.**  
+- Rotate keys if they were ever exposed in chat, logs, or screenshots.  
+- This repo only ships `secrets.json.example` with placeholders.
+
+---
 
 ## License
 
@@ -141,5 +205,5 @@ Crop2Draw/
 
 ## Acknowledgements
 
-- [draw.io / diagrams.net](https://www.diagrams.net/)
-- Baidu AI Cloud OCR API (optional dependency for text modes)
+- [draw.io / diagrams.net](https://www.diagrams.net/)  
+- Baidu AI Cloud OCR API (optional, text modes)  
