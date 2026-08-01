@@ -7,8 +7,10 @@ import base64
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import zipfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -64,6 +66,10 @@ import baidu_ocr
 MODE_IMAGE = "image"
 MODE_TEXT_WHITE = "text_white"
 MODE_TEXT_COLOR = "text_color"
+
+PROJECT_EXT = ".c2d"
+PROJECT_FORMAT = "crop2draw-project"
+PROJECT_VERSION = 1
 
 
 @dataclass
@@ -1359,12 +1365,16 @@ class MainWindow(QMainWindow):
         self.btn_export_open = QPushButton("一键导出并打开")
         self.btn_open_crops = QPushButton("打开裁切图片文件夹")
         self.btn_replace = QPushButton("图片替换处理器")
+        self.btn_export_project = QPushButton("导出工程文件 (.c2d)")
+        self.btn_open_project = QPushButton("打开工程文件 (.c2d)")
         self.btn_rename.clicked.connect(self.rename_selected)
         self.btn_delete.clicked.connect(self.delete_selected)
         self.btn_export.clicked.connect(lambda: self.export_drawio(open_after=False))
         self.btn_export_open.clicked.connect(lambda: self.export_drawio(open_after=True))
         self.btn_open_crops.clicked.connect(self.open_crops_folder)
         self.btn_replace.clicked.connect(self.open_replace_processor)
+        self.btn_export_project.clicked.connect(self.export_project)
+        self.btn_open_project.clicked.connect(self.open_project_dialog)
         self.btn_export.setStyleSheet(
             "QPushButton{background:#2e7d32;color:white;font-weight:bold;padding:8px;}"
         )
@@ -1374,6 +1384,12 @@ class MainWindow(QMainWindow):
         self.btn_replace.setStyleSheet(
             "QPushButton{background:#ef6c00;color:white;font-weight:bold;padding:8px;}"
         )
+        self.btn_export_project.setStyleSheet(
+            "QPushButton{background:#6a1b9a;color:white;font-weight:bold;padding:8px;}"
+        )
+        self.btn_open_project.setStyleSheet(
+            "QPushButton{background:#4527a0;color:white;font-weight:bold;padding:8px;}"
+        )
         btn_row.addWidget(self.btn_rename)
         btn_row.addWidget(self.btn_delete)
         side_layout.addLayout(btn_row)
@@ -1381,6 +1397,8 @@ class MainWindow(QMainWindow):
         side_layout.addWidget(self.btn_export_open)
         side_layout.addWidget(self.btn_open_crops)
         side_layout.addWidget(self.btn_replace)
+        side_layout.addWidget(self.btn_export_project)
+        side_layout.addWidget(self.btn_open_project)
 
         tip = QLabel(
             "① 拖拽画框 ② 鼠标右侧出现模式菜单\n"
@@ -1388,6 +1406,7 @@ class MainWindow(QMainWindow):
             "④ 可拖角落微调后再按快捷键\n"
             "导出层级：先裁的在上，后裁的在下\n"
             "右键拖拽 / 中键 / 空格+左键 平移画布\n"
+            ".c2d 工程可发给他人继续裁切\n"
             "列表可 Ctrl/Shift 多选后删除 · Esc取消选区"
         )
         tip.setWordWrap(True)
@@ -1405,6 +1424,10 @@ class MainWindow(QMainWindow):
         self.addToolBar(tb)
         act_open = QAction("打开图片", self)
         act_open.triggered.connect(self.open_image)
+        act_open_proj = QAction("打开工程", self)
+        act_open_proj.triggered.connect(self.open_project_dialog)
+        act_save_proj = QAction("导出工程", self)
+        act_save_proj.triggered.connect(self.export_project)
         act_fit = QAction("适应窗口", self)
         act_fit.triggered.connect(self.canvas.fit_to_view)
         act_out = QAction("选择输出目录", self)
@@ -1412,6 +1435,8 @@ class MainWindow(QMainWindow):
         act_test = QAction("测试 OCR 连通", self)
         act_test.triggered.connect(self.test_ocr)
         tb.addAction(act_open)
+        tb.addAction(act_open_proj)
+        tb.addAction(act_save_proj)
         tb.addAction(act_fit)
         tb.addAction(act_out)
         tb.addAction(act_test)
@@ -1616,6 +1641,183 @@ class MainWindow(QMainWindow):
         )
         if path:
             self.load_image_path(Path(path))
+
+    def export_project(self) -> None:
+        """Pack source image + crops + manifest into a transferable .c2d project file."""
+        if self.original_image is None or self.image_path is None:
+            QMessageBox.information(self, "提示", "请先打开图片或工程")
+            return
+        out = self.ensure_output_dir()
+        if out is None:
+            return
+        self.save_manifest()
+
+        default_name = f"{self.image_path.stem}.c2d"
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "导出工程文件",
+            str(self.image_path.parent / default_name),
+            f"Crop2Draw Project (*{PROJECT_EXT})",
+        )
+        if not path:
+            return
+        dest = Path(path)
+        if dest.suffix.lower() != PROJECT_EXT:
+            dest = dest.with_suffix(PROJECT_EXT)
+
+        # Prefer PNG for lossless handoff; keep original suffix hint in metadata
+        src_suffix = self.image_path.suffix.lower() or ".png"
+        if src_suffix not in (".png", ".jpg", ".jpeg", ".bmp", ".webp"):
+            src_suffix = ".png"
+        source_name = f"source{src_suffix}"
+
+        try:
+            with zipfile.ZipFile(dest, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+                # source image bytes
+                buf = BytesIO()
+                save_fmt = "PNG" if src_suffix == ".png" else ("JPEG" if src_suffix in (".jpg", ".jpeg") else "PNG")
+                if save_fmt == "JPEG":
+                    self.original_image.convert("RGB").save(buf, format="JPEG", quality=95)
+                    source_name = "source.jpg"
+                else:
+                    self.original_image.save(buf, format="PNG")
+                    source_name = "source.png"
+                zf.writestr(source_name, buf.getvalue())
+
+                crops_meta = []
+                for item in self.crops:
+                    d = asdict(item)
+                    crops_meta.append(d)
+                    if item.file:
+                        crop_path = out / "crops" / item.file
+                        if crop_path.exists():
+                            zf.write(crop_path, arcname=f"crops/{item.file}")
+
+                project = {
+                    "format": PROJECT_FORMAT,
+                    "version": PROJECT_VERSION,
+                    "app": "Crop2Draw",
+                    "source": source_name,
+                    "source_name": self.image_path.name,
+                    "image_size": [self.original_image.width, self.original_image.height],
+                    "crops": crops_meta,
+                }
+                zf.writestr(
+                    "project.json",
+                    json.dumps(project, indent=2, ensure_ascii=False),
+                )
+                # also embed icons.json for compatibility with folder workflow
+                zf.writestr(
+                    "icons.json",
+                    json.dumps(crops_meta, indent=2, ensure_ascii=False),
+                )
+        except Exception as e:
+            QMessageBox.critical(self, "导出失败", str(e))
+            return
+
+        QMessageBox.information(
+            self,
+            "工程已导出",
+            f"已保存工程文件：\n{dest}\n\n"
+            f"包含原图 + {len(self.crops)} 个裁切。\n"
+            "发给对方后，用「打开工程文件」即可继续编辑。",
+        )
+        self.status.showMessage(f"已导出工程 {dest.name} · {len(self.crops)} 个裁切")
+
+    def open_project_dialog(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "打开工程文件",
+            str(Path.home()),
+            f"Crop2Draw Project (*{PROJECT_EXT});;Zip (*.zip)",
+        )
+        if path:
+            self.open_project_path(Path(path))
+
+    def open_project_path(self, package: Path) -> None:
+        """Unpack a .c2d project and resume editing."""
+        if not package.exists():
+            QMessageBox.warning(self, "打开失败", f"文件不存在：\n{package}")
+            return
+        # Workspace next to the package so B can keep working and re-export
+        work_dir = package.parent / f"{package.stem}_work"
+        try:
+            if work_dir.exists():
+                # refresh extract (overwrite) so received updates apply
+                shutil.rmtree(work_dir)
+            work_dir.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(package, "r") as zf:
+                # basic safety: reject path traversal
+                for name in zf.namelist():
+                    target = (work_dir / name).resolve()
+                    if not str(target).startswith(str(work_dir.resolve())):
+                        raise ValueError(f"非法路径: {name}")
+                zf.extractall(work_dir)
+        except Exception as e:
+            QMessageBox.critical(self, "打开工程失败", str(e))
+            return
+
+        project_path = work_dir / "project.json"
+        icons_path = work_dir / "icons.json"
+        try:
+            if project_path.exists():
+                project = json.loads(project_path.read_text(encoding="utf-8"))
+            elif icons_path.exists():
+                project = {
+                    "format": PROJECT_FORMAT,
+                    "version": 1,
+                    "source": "source.png",
+                    "crops": json.loads(icons_path.read_text(encoding="utf-8")),
+                }
+            else:
+                raise FileNotFoundError("工程内缺少 project.json / icons.json")
+        except Exception as e:
+            QMessageBox.critical(self, "工程损坏", str(e))
+            return
+
+        source_rel = project.get("source") or "source.png"
+        source_path = work_dir / source_rel
+        if not source_path.exists():
+            # fallback: first image-like file at root
+            candidates = list(work_dir.glob("source.*")) + list(work_dir.glob("*.png"))
+            candidates = [p for p in candidates if p.is_file() and p.name != "icons.json"]
+            if not candidates:
+                QMessageBox.critical(self, "工程损坏", "找不到原图 source.*")
+                return
+            source_path = candidates[0]
+
+        crops_dir = work_dir / "crops"
+        crops_dir.mkdir(exist_ok=True)
+
+        # Persist icons.json for subsequent saves
+        crops_data = project.get("crops") or []
+        icons_path.write_text(
+            json.dumps(crops_data, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+
+        self.output_dir = work_dir
+        self.image_path = source_path
+        self.original_image = Image.open(source_path).convert("RGBA")
+        self.work_image = self.original_image.copy()
+        self.crops = [CropItem.from_dict(d) for d in crops_data]
+        self.rebuild_work_image()
+        self.canvas.set_image(
+            pil_to_qpixmap(self.work_image),
+            self.work_image.width,
+            self.work_image.height,
+            reset_view=True,
+        )
+        self.refresh_list()
+        self.status.showMessage(
+            f"已打开工程 {package.name} · {len(self.crops)} 个裁切 · 工作目录 {work_dir.name}"
+        )
+        QMessageBox.information(
+            self,
+            "工程已打开",
+            f"已恢复 {len(self.crops)} 个裁切。\n\n"
+            f"工作目录：\n{work_dir}\n\n"
+            "可继续裁切；完成后可再「导出工程文件」发回。",
+        )
 
     def rebuild_work_image(self) -> None:
         if self.original_image is None:
@@ -2052,7 +2254,19 @@ def main() -> int:
     if len(sys.argv) > 1:
         path = Path(sys.argv[1])
         if path.exists():
-            win.load_image_path(path)
+            if path.suffix.lower() in (PROJECT_EXT, ".zip") and zipfile.is_zipfile(path):
+                # .c2d is a zip package; plain zips may also be projects
+                try:
+                    with zipfile.ZipFile(path, "r") as zf:
+                        names = set(zf.namelist())
+                    if "project.json" in names or "icons.json" in names:
+                        win.open_project_path(path)
+                    else:
+                        win.load_image_path(path)
+                except Exception:
+                    win.open_project_path(path)
+            else:
+                win.load_image_path(path)
     return app.exec()
 
 
