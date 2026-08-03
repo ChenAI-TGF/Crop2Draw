@@ -27,15 +27,15 @@ If you work on paper reproduction or group meetings, you have probably hit this:
 
 **Source figure to reconstruct:**
 
-![Source figure](examples/01_source.png)
+![Source figure](examples/01_source.jpg)
 
 **After punch-out cropping:**
 
-![Punch-out progress](examples/02_punch_out.png)
+![Punch-out progress](examples/02_punch_out.jpg)
 
 **One-click export to draw.io:**
 
-![Editable draw.io result](examples/03_drawio_result.png)
+![Editable draw.io result](examples/03_drawio_result.jpg)
 
 Text is editable; font family, color, and size can be changed; image crops stay adjustable. AI-generated or scraped figures become a fully editable draw.io structure.
 
@@ -55,17 +55,17 @@ One line: **crop a complex schematic into layers, then export draw.io.**
 
 - After drawing a box, pick a mode next to the cursor (shortcuts `1` / `2` / `3`):
 
-![Mode menu](examples/04_mode_menu.png)
+![Mode menu](examples/04_mode_menu.jpg)
 
 - OCR: choose **Standard** or **Accurate** (Baidu API; configure keys locally). If Standard is weak, re-run Accurate from the review dialog (you may still need light manual fixes):
 
-![OCR settings](examples/05_ocr_settings.png)
+![OCR settings](examples/05_ocr_settings.jpg)
 
 - After OCR, fill the punched region with **white** or the **surrounding color**, so you do not leave an ugly blank hole:
 
-![OCR review / fill](examples/06_ocr_review.png)
+![OCR review / fill](examples/06_ocr_review.jpg)
 
-![Editable text after punch-out](examples/07_editable_text.png)
+![Editable text after punch-out](examples/07_editable_text.jpg)
 
 Text becomes editable while nearby rounded rectangles stay intact.
 
